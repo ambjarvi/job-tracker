@@ -18,6 +18,10 @@ export const resolvers = {
     resume: (app) => resumes.find((r) => r.id === app.resumeId) ?? null,
   },
 
+  Resume: {
+    applications: (resume) => applications.filter((a) => a.resumeId === resume.id),
+  },
+
   Mutation: {
     addApplication: (_, { company, role, url, description = null, status, resumeId }) => {
       if (!resumes.find((r) => r.id === resumeId)) {

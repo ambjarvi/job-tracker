@@ -18,6 +18,7 @@ export const typeDefs = `#graphql
     filePath: String!
     fileType: FileType!
     uploadedAt: String!
+    applications: [Application!]!
   }
 
   type Application {
