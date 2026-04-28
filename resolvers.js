@@ -1,5 +1,15 @@
 import { randomUUID } from 'crypto';
+import { readFile } from 'fs/promises';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { GraphQLError } from 'graphql';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+import Anthropic from '@anthropic-ai/sdk';
+import mammoth from 'mammoth';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 import { resumes, applications } from './data.js';
 
 export const resolvers = {
@@ -82,6 +92,59 @@ export const resolvers = {
       if (idx === -1) return false;
       resumes.splice(idx, 1);
       return true;
+    },
+
+    tailorResume: async (_, { resumeId, applicationId }) => {
+      const resume = resumes.find((r) => r.id === resumeId);
+      if (!resume) {
+        throw new GraphQLError(`Resume with id "${resumeId}" not found`, {
+          extensions: { code: 'NOT_FOUND' },
+        });
+      }
+      const application = applications.find((a) => a.id === applicationId);
+      if (!application) {
+        throw new GraphQLError(`Application with id "${applicationId}" not found`, {
+          extensions: { code: 'NOT_FOUND' },
+        });
+      }
+
+      let resumeText;
+      const fileBuffer = await readFile(resolve(__dirname, '.' + resume.filePath)).catch(() => {
+        throw new GraphQLError(`Could not read resume file at "${resume.filePath}"`, {
+          extensions: { code: 'FILE_READ_ERROR' },
+        });
+      });
+
+      if (resume.fileType === 'DOCX') {
+        const result = await mammoth.extractRawText({ buffer: fileBuffer });
+        resumeText = result.value;
+      } else {
+        const result = await pdfParse(fileBuffer);
+        resumeText = result.text;
+      }
+
+      const client = new Anthropic();
+      const message = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: `You are a career coach helping tailor a resume for a specific job application.
+
+Job: ${application.role} at ${application.company}
+${application.description ? `Job Description:\n${application.description}\n` : ''}
+Resume Content:
+${resumeText}
+
+Provide specific, actionable suggestions to tailor this resume for the job. Focus on keywords to add, skills to highlight, and experience to reframe.`,
+          },
+        ],
+      });
+
+      const suggestions = message.content[0].type === 'text' ? message.content[0].text : '';
+
+      return { resumeId, applicationId, suggestions };
     },
   },
 };

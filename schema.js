@@ -40,6 +40,12 @@ export const typeDefs = `#graphql
     resume(id: ID!): Resume
   }
 
+  type TailoringResult {
+    resumeId: ID!
+    applicationId: ID!
+    suggestions: String!
+  }
+
   type Mutation {
     addApplication(
       company: String!
@@ -61,5 +67,7 @@ export const typeDefs = `#graphql
     ): Resume!
 
     deleteResume(id: ID!): Boolean!
+
+    tailorResume(resumeId: ID!, applicationId: ID!): TailoringResult!
   }
 `;
