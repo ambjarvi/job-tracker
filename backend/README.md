@@ -1,6 +1,6 @@
 # Job Application Tracker
 
-🔗 **Live Site:** [job-tracker-git-main-amber-jarvis-projects.vercel.app](#)
+🔗 **Live Site:** [Job-Tracker](https://job-tracker-git-main-amber-jarvis-projects.vercel.app)
 
 A full-stack job application tracker with an AI-powered resume tailoring feature. Built entirely using **Claude Code** for agentic, goal-driven development.
 
