@@ -8,13 +8,11 @@ services:
     envVars:
       - key: MONGODB_URI
         sync: false
-      - key: AWS_ACCESS_KEY_ID
+      - key: CLOUDINARY_CLOUD_NAME
         sync: false
-      - key: AWS_SECRET_ACCESS_KEY
+      - key: CLOUDINARY_API_KEY
         sync: false
-      - key: AWS_REGION
-        sync: false
-      - key: S3_BUCKET_NAME
+      - key: CLOUDINARY_API_SECRET
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false

@@ -1,15 +1,17 @@
-import { randomUUID } from 'crypto'
 import { GraphQLError } from 'graphql'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 import Anthropic from '@anthropic-ai/sdk'
 import mammoth from 'mammoth'
 import GraphQLUpload from 'graphql-upload/GraphQLUpload.mjs'
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { v2 as cloudinary } from 'cloudinary'
 import { Resume } from './src/models/Resume.js'
 import { Application } from './src/models/Application.js'
 
-const s3 = new S3Client({ region: process.env.AWS_REGION })
-const bucket = process.env.S3_BUCKET_NAME
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 async function streamToBuffer(stream) {
   const chunks = []
@@ -101,24 +103,16 @@ export const resolvers = {
 
     uploadResumeFile: async (_, { name, file, fileType }) => {
       const { createReadStream } = await file
-
-      const ext = fileType === 'DOCX' ? '.docx' : '.pdf'
-      const key = `resumes/${randomUUID()}${ext}`
-      const contentType = fileType === 'DOCX'
-        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : 'application/pdf'
-
       const buffer = await streamToBuffer(createReadStream())
 
-      await s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
-      }))
+      const result = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          { resource_type: 'raw', folder: 'resumes' },
+          (err, res) => (err ? reject(err) : resolve(res))
+        ).end(buffer)
+      })
 
-      const filePath = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
-      const resume = new Resume({ name, filePath, fileType })
+      const resume = new Resume({ name, filePath: result.secure_url, fileType })
       return resume.save()
     },
 
@@ -147,11 +141,11 @@ export const resolvers = {
         })
       }
 
-      const s3Key = new URL(resume.filePath).pathname.slice(1)
       let fileBuffer
       try {
-        const { Body } = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: s3Key }))
-        fileBuffer = await streamToBuffer(Body)
+        const res = await fetch(resume.filePath)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        fileBuffer = Buffer.from(await res.arrayBuffer())
       } catch {
         throw new GraphQLError(`Could not read resume file at "${resume.filePath}"`, {
           extensions: { code: 'FILE_READ_ERROR' },
