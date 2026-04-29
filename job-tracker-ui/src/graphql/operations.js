@@ -33,8 +33,22 @@ export const GET_RESUMES = gql`
 `
 
 export const CREATE_APPLICATION = gql`
-  mutation CreateApplication($input: CreateApplicationInput!) {
-    createApplication(input: $input) {
+  mutation CreateApplication(
+    $company: String!
+    $role: String!
+    $url: String
+    $description: String
+    $status: ApplicationStatus!
+    $resumeId: ID
+  ) {
+    addApplication(
+      company: $company
+      role: $role
+      url: $url
+      description: $description
+      status: $status
+      resumeId: $resumeId
+    ) {
       id
       company
       role
@@ -52,9 +66,23 @@ export const CREATE_APPLICATION = gql`
 
 export const UPDATE_APPLICATION_STATUS = gql`
   mutation UpdateApplicationStatus($id: ID!, $status: ApplicationStatus!) {
-    updateApplication(id: $id, input: { status: $status }) {
+    updateStatus(id: $id, status: $status) {
       id
       status
+    }
+  }
+`
+
+export const UPLOAD_RESUME_FILE = gql`
+  mutation UploadResumeFile($name: String!, $file: Upload!, $fileType: FileType!) {
+    uploadResumeFile(name: $name, file: $file, fileType: $fileType) {
+      id
+      name
+      fileType
+      uploadedAt
+      applications {
+        id
+      }
     }
   }
 `
@@ -62,7 +90,8 @@ export const UPDATE_APPLICATION_STATUS = gql`
 export const TAILOR_RESUME = gql`
   mutation TailorResume($applicationId: ID!, $resumeId: ID!) {
     tailorResume(applicationId: $applicationId, resumeId: $resumeId) {
-      tailoredResume
+      resumeId
+      applicationId
       suggestions
     }
   }

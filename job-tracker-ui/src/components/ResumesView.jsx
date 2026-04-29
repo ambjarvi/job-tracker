@@ -1,5 +1,6 @@
-import { useQuery } from '@apollo/client/react'
-import { GET_RESUMES } from '../graphql/operations'
+import { useRef, useState } from 'react'
+import { useMutation, useQuery } from '@apollo/client/react'
+import { GET_RESUMES, UPLOAD_RESUME_FILE } from '../graphql/operations'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -15,8 +16,112 @@ function formatDate(dateStr) {
 const TYPE_STYLES = {
   PDF: 'bg-red-500/15 text-red-400 border-red-500/30',
   DOCX: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  DOC: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  TXT: 'bg-zinc-700/50 text-zinc-400 border-zinc-600/50',
+}
+
+function fileTypeFromFile(file) {
+  return file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOCX'
+}
+
+function UploadForm({ refetch }) {
+  const fileInputRef = useRef(null)
+  const [name, setName] = useState('')
+  const [file, setFile] = useState(null)
+  const [fieldError, setFieldError] = useState('')
+
+  const [uploadResumeFile, { loading, error }] = useMutation(UPLOAD_RESUME_FILE, {
+    refetchQueries: [{ query: GET_RESUMES }],
+  })
+
+  function handleFileChange(e) {
+    const f = e.target.files[0]
+    if (!f) return
+    setFile(f)
+    setFieldError('')
+    if (!name) setName(f.name.replace(/\.(pdf|docx)$/i, ''))
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!file) { setFieldError('Please choose a file'); return }
+    if (!name.trim()) { setFieldError('Name is required'); return }
+    await uploadResumeFile({
+      variables: { name: name.trim(), file, fileType: fileTypeFromFile(file) },
+    })
+    setName('')
+    setFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+    >
+      <h2 className="text-sm font-semibold text-zinc-300">Upload a resume</h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+            Name <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => { setName(e.target.value); setFieldError('') }}
+            placeholder="SWE Resume v3"
+            className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 placeholder-zinc-600 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500/70 focus:ring-1 focus:ring-indigo-500/40 transition-colors"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+            File <span className="text-red-400">*</span>
+          </label>
+          <label className="flex items-center gap-2 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3.5 py-2.5 text-sm cursor-pointer hover:border-zinc-600 transition-colors">
+            <svg className="w-4 h-4 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 0l-3 3m3-3l3 3M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
+            </svg>
+            <span className={file ? 'text-zinc-200 truncate' : 'text-zinc-500 truncate'}>
+              {file ? file.name : 'Choose .pdf or .docx…'}
+            </span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx"
+              onChange={handleFileChange}
+              className="sr-only"
+            />
+          </label>
+        </div>
+      </div>
+
+      {fieldError && (
+        <p className="text-red-400 text-xs">{fieldError}</p>
+      )}
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-xs">
+          {error.message}
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          {loading && (
+            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
+          {loading ? 'Uploading…' : 'Upload'}
+        </button>
+      </div>
+    </form>
+  )
 }
 
 function ResumeCard({ resume }) {
@@ -84,6 +189,8 @@ export default function ResumesView() {
         </p>
       </div>
 
+      <UploadForm />
+
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
           Failed to load resumes: {error.message}
@@ -103,8 +210,8 @@ export default function ResumesView() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <p className="text-zinc-400 font-medium">No resumes uploaded</p>
-          <p className="text-zinc-600 text-sm mt-1">Upload resumes through the API to see them here</p>
+          <p className="text-zinc-400 font-medium">No resumes yet</p>
+          <p className="text-zinc-600 text-sm mt-1">Upload your first resume above</p>
         </div>
       )}
 

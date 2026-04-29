@@ -9,9 +9,13 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
     "@apollo/server": "^4.11.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "graphql": "^16.9.0",
+    "graphql-upload": "^17.0.0",
     "mammoth": "^1.12.0",
     "node-html-parser": "^7.1.0",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.7.284"
   }
 }

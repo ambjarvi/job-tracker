@@ -21,8 +21,8 @@ export default function TailorResume() {
   }
 
   async function handleCopy() {
-    if (!result?.tailoredResume) return
-    await navigator.clipboard.writeText(result.tailoredResume)
+    if (!result?.suggestions) return
+    await navigator.clipboard.writeText(result.suggestions)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -133,62 +133,39 @@ export default function TailorResume() {
       {/* Results */}
       {result && !loading && (
         <div className="space-y-6">
-          {/* Tailored resume */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-              <div>
-                <h2 className="text-zinc-100 font-semibold text-base">Tailored Resume</h2>
-                <p className="text-zinc-500 text-xs mt-0.5">
-                  Rewritten to highlight relevant experience for this role
-                </p>
-              </div>
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition-colors"
-              >
-                {copied ? (
-                  <>
-                    <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-emerald-400">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Copy
-                  </>
-                )}
-              </button>
-            </div>
-            <pre className="px-6 py-5 text-sm text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
-              {result.tailoredResume}
-            </pre>
-          </div>
-
-          {/* Suggestions */}
-          {result.suggestions && result.suggestions.length > 0 && (
+          {result.suggestions && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-zinc-800">
-                <h2 className="text-zinc-100 font-semibold text-base">Suggestions</h2>
-                <p className="text-zinc-500 text-xs mt-0.5">
-                  Skills the job mentions that aren't in your resume
-                </p>
-              </div>
-              <ul className="divide-y divide-zinc-800/60">
-                {result.suggestions.map((suggestion, i) => (
-                  <li key={i} className="flex items-start gap-3 px-6 py-4">
-                    <div className="w-5 h-5 bg-amber-500/15 border border-amber-500/30 rounded flex items-center justify-center shrink-0 mt-0.5">
-                      <svg className="w-3 h-3 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+                <div>
+                  <h2 className="text-zinc-100 font-semibold text-base">Suggestions</h2>
+                  <p className="text-zinc-500 text-xs mt-0.5">
+                    AI-generated advice to tailor your resume for this role
+                  </p>
+                </div>
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition-colors"
+                >
+                  {copied ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
-                    </div>
-                    <p className="text-zinc-300 text-sm leading-relaxed">{suggestion}</p>
-                  </li>
-                ))}
-              </ul>
+                      <span className="text-emerald-400">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="px-6 py-5 text-sm text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
+                {result.suggestions}
+              </pre>
             </div>
           )}
         </div>

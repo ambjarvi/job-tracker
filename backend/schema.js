@@ -1,4 +1,6 @@
 export const typeDefs = `#graphql
+  scalar Upload
+
   enum ApplicationStatus {
     WISHLIST
     APPLIED
@@ -25,11 +27,11 @@ export const typeDefs = `#graphql
     id: ID!
     company: String!
     role: String!
-    url: String!
+    url: String
     description: String
     status: ApplicationStatus!
     appliedAt: String
-    resumeId: ID!
+    resumeId: ID
     resume: Resume
   }
 
@@ -50,10 +52,10 @@ export const typeDefs = `#graphql
     addApplication(
       company: String!
       role: String!
-      url: String!
+      url: String
       description: String
       status: ApplicationStatus!
-      resumeId: ID!
+      resumeId: ID
     ): Application!
 
     updateStatus(id: ID!, status: ApplicationStatus!): Application
@@ -66,8 +68,14 @@ export const typeDefs = `#graphql
       fileType: FileType!
     ): Resume!
 
+    uploadResumeFile(
+      name: String!
+      file: Upload!
+      fileType: FileType!
+    ): Resume!
+
     deleteResume(id: ID!): Boolean!
 
     tailorResume(resumeId: ID!, applicationId: ID!): TailoringResult!
   }
-`;
+`
