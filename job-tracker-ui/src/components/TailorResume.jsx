@@ -46,8 +46,8 @@ function toLines(value) {
     .filter(Boolean)
 }
 
-export default function TailorResume() {
-  const [applicationId, setApplicationId] = useState('')
+export default function TailorResume({ initialApplicationId }) {
+  const [applicationId, setApplicationId] = useState(initialApplicationId ?? '')
   const [resumeId, setResumeId] = useState('')
   const [result, setResult] = useState(null)
 

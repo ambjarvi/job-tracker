@@ -46,10 +46,17 @@ const NAV = [
 export default function App() {
   const [view, setView] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [tailorApplicationId, setTailorApplicationId] = useState(null)
 
   function navigate(id) {
+    setTailorApplicationId(null)
     setView(id)
     setSidebarOpen(false)
+  }
+
+  function handleNavigate(id, param) {
+    if (id === 'tailor' && param) setTailorApplicationId(param)
+    setView(id)
   }
 
   return (
@@ -125,12 +132,14 @@ export default function App() {
         </header>
 
         <main className="flex-1 p-6 lg:p-8 overflow-auto">
-          {view === 'dashboard' && <Dashboard />}
+          {view === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
           {view === 'add' && (
             <AddApplicationForm onSuccess={() => navigate('dashboard')} />
           )}
           {view === 'resumes' && <ResumesView />}
-          {view === 'tailor' && <TailorResume />}
+          {view === 'tailor' && (
+            <TailorResume initialApplicationId={tailorApplicationId} />
+          )}
         </main>
       </div>
     </div>

@@ -91,6 +91,33 @@ export const resolvers = {
       return app.save()
     },
 
+    updateApplication: async (_, { id, company, role, url, description, status, resumeId }) => {
+      const app = await Application.findById(id)
+      if (!app) return null
+      if (company !== undefined) app.company = company
+      if (role !== undefined) app.role = role
+      if (url !== undefined) app.url = url ?? null
+      if (description !== undefined) app.description = description ?? null
+      if (resumeId !== undefined) {
+        if (resumeId) {
+          const exists = await Resume.findById(resumeId)
+          if (!exists) {
+            throw new GraphQLError(`Resume with id "${resumeId}" not found`, {
+              extensions: { code: 'NOT_FOUND' },
+            })
+          }
+        }
+        app.resumeId = resumeId || null
+      }
+      if (status !== undefined) {
+        app.status = status
+        if (status !== 'WISHLIST' && !app.appliedAt) {
+          app.appliedAt = new Date().toISOString()
+        }
+      }
+      return app.save()
+    },
+
     deleteApplication: async (_, { id }) => {
       const result = await Application.findByIdAndDelete(id)
       return result !== null

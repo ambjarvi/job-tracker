@@ -87,6 +87,46 @@ export const UPLOAD_RESUME_FILE = gql`
   }
 `
 
+export const UPDATE_APPLICATION = gql`
+  mutation UpdateApplication(
+    $id: ID!
+    $company: String
+    $role: String
+    $url: String
+    $description: String
+    $status: ApplicationStatus
+    $resumeId: ID
+  ) {
+    updateApplication(
+      id: $id
+      company: $company
+      role: $role
+      url: $url
+      description: $description
+      status: $status
+      resumeId: $resumeId
+    ) {
+      id
+      company
+      role
+      url
+      description
+      status
+      appliedAt
+      resume {
+        id
+        name
+      }
+    }
+  }
+`
+
+export const DELETE_APPLICATION = gql`
+  mutation DeleteApplication($id: ID!) {
+    deleteApplication(id: $id)
+  }
+`
+
 export const TAILOR_RESUME = gql`
   mutation TailorResume($applicationId: ID!, $resumeId: ID!) {
     tailorResume(applicationId: $applicationId, resumeId: $resumeId) {

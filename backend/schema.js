@@ -62,6 +62,16 @@ export const typeDefs = `#graphql
 
     updateStatus(id: ID!, status: ApplicationStatus!): Application
 
+    updateApplication(
+      id: ID!
+      company: String
+      role: String
+      url: String
+      description: String
+      status: ApplicationStatus
+      resumeId: ID
+    ): Application
+
     deleteApplication(id: ID!): Boolean!
 
     uploadResume(

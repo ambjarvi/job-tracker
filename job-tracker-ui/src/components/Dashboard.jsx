@@ -38,7 +38,7 @@ function SkeletonCard() {
   )
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onNavigate }) {
   const [filter, setFilter] = useState('ALL')
   const { data, loading, error } = useQuery(GET_APPLICATIONS)
 
@@ -130,7 +130,7 @@ export default function Dashboard() {
       {!loading && !error && filtered.length > 0 && (
         <div className="space-y-3">
           {filtered.map((app) => (
-            <ApplicationCard key={app.id} application={app} />
+            <ApplicationCard key={app.id} application={app} onNavigate={onNavigate} />
           ))}
         </div>
       )}
