@@ -1,7 +1,7 @@
 import { ApolloClient, InMemoryCache, ApolloLink, Observable, HttpLink } from '@apollo/client/core'
 import { print } from 'graphql'
 
-const URI = 'http://localhost:4000/'
+const URI = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/'
 
 // Intercepts mutations that contain File variables and sends them as
 // multipart/form-data per the graphql-multipart-request-spec.

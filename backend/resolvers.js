@@ -1,16 +1,21 @@
 import { randomUUID } from 'crypto'
-import { readFile, mkdir } from 'fs/promises'
-import { createWriteStream } from 'fs'
-import { resolve } from 'path'
-import { fileURLToPath } from 'url'
 import { GraphQLError } from 'graphql'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 import Anthropic from '@anthropic-ai/sdk'
 import mammoth from 'mammoth'
 import GraphQLUpload from 'graphql-upload/GraphQLUpload.mjs'
-import { resumes, applications } from './data.js'
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { Resume } from './src/models/Resume.js'
+import { Application } from './src/models/Application.js'
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const s3 = new S3Client({ region: process.env.AWS_REGION })
+const bucket = process.env.S3_BUCKET_NAME
+
+async function streamToBuffer(stream) {
+  const chunks = []
+  for await (const chunk of stream) chunks.push(chunk)
+  return Buffer.concat(chunks)
+}
 
 async function extractPdfText(buffer) {
   const uint8 = new Uint8Array(buffer)
@@ -29,134 +34,129 @@ export const resolvers = {
   Upload: GraphQLUpload,
 
   Query: {
-    applications: (_, { status }) =>
-      status ? applications.filter((a) => a.status === status) : [...applications],
+    applications: async (_, { status }) => {
+      const filter = status ? { status } : {}
+      return Application.find(filter)
+    },
 
-    application: (_, { id }) => applications.find((a) => a.id === id) ?? null,
+    application: async (_, { id }) => Application.findById(id),
 
-    resumes: () => [...resumes],
+    resumes: async () => Resume.find(),
 
-    resume: (_, { id }) => resumes.find((r) => r.id === id) ?? null,
+    resume: async (_, { id }) => Resume.findById(id),
   },
 
   Application: {
-    resume: (app) => resumes.find((r) => r.id === app.resumeId) ?? null,
+    resume: async (app) => {
+      if (!app.resumeId) return null
+      return Resume.findById(app.resumeId)
+    },
   },
 
   Resume: {
-    applications: (resume) => applications.filter((a) => a.resumeId === resume.id),
+    applications: async (resume) => Application.find({ resumeId: resume._id }),
   },
 
   Mutation: {
-    addApplication: (_, { company, role, url = null, description = null, status, resumeId = null }) => {
-      if (resumeId && !resumes.find((r) => r.id === resumeId)) {
-        throw new GraphQLError(`Resume with id "${resumeId}" not found`, {
-          extensions: { code: 'NOT_FOUND' },
-        })
+    addApplication: async (_, { company, role, url = null, description = null, status, resumeId = null }) => {
+      if (resumeId) {
+        const exists = await Resume.findById(resumeId)
+        if (!exists) {
+          throw new GraphQLError(`Resume with id "${resumeId}" not found`, {
+            extensions: { code: 'NOT_FOUND' },
+          })
+        }
       }
-      const app = {
-        id: randomUUID(),
+      const app = new Application({
         company,
         role,
         url,
         description,
         status,
         appliedAt: status !== 'WISHLIST' ? new Date().toISOString() : null,
-        resumeId,
-      }
-      applications.push(app)
-      return app
+        resumeId: resumeId || null,
+      })
+      return app.save()
     },
 
-    updateStatus: (_, { id, status }) => {
-      const app = applications.find((a) => a.id === id)
+    updateStatus: async (_, { id, status }) => {
+      const app = await Application.findById(id)
       if (!app) return null
       app.status = status
       if (status !== 'WISHLIST' && !app.appliedAt) {
         app.appliedAt = new Date().toISOString()
       }
-      return app
+      return app.save()
     },
 
-    deleteApplication: (_, { id }) => {
-      const idx = applications.findIndex((a) => a.id === id)
-      if (idx === -1) return false
-      applications.splice(idx, 1)
-      return true
+    deleteApplication: async (_, { id }) => {
+      const result = await Application.findByIdAndDelete(id)
+      return result !== null
     },
 
-    uploadResume: (_, { name, filePath, fileType }) => {
-      const resume = {
-        id: randomUUID(),
-        name,
-        filePath,
-        fileType,
-        uploadedAt: new Date().toISOString(),
-      }
-      resumes.push(resume)
-      return resume
+    uploadResume: async (_, { name, filePath, fileType }) => {
+      const resume = new Resume({ name, filePath, fileType })
+      return resume.save()
     },
 
     uploadResumeFile: async (_, { name, file, fileType }) => {
-      const { createReadStream, filename } = await file
-
-      const uploadsDir = resolve(__dirname, 'uploads')
-      await mkdir(uploadsDir, { recursive: true })
+      const { createReadStream } = await file
 
       const ext = fileType === 'DOCX' ? '.docx' : '.pdf'
-      const savedName = `${randomUUID()}${ext}`
-      const filePath = `/uploads/${savedName}`
-      const fullPath = resolve(uploadsDir, savedName)
+      const key = `resumes/${randomUUID()}${ext}`
+      const contentType = fileType === 'DOCX'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/pdf'
 
-      await new Promise((res, rej) => {
-        const ws = createWriteStream(fullPath)
-        createReadStream().pipe(ws)
-        ws.on('finish', res)
-        ws.on('error', rej)
-      })
+      const buffer = await streamToBuffer(createReadStream())
 
-      const resume = {
-        id: randomUUID(),
-        name,
-        filePath,
-        fileType,
-        uploadedAt: new Date().toISOString(),
-      }
-      resumes.push(resume)
-      return resume
+      await s3.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }))
+
+      const filePath = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
+      const resume = new Resume({ name, filePath, fileType })
+      return resume.save()
     },
 
-    deleteResume: (_, { id }) => {
-      if (applications.some((a) => a.resumeId === id)) {
+    deleteResume: async (_, { id }) => {
+      const inUse = await Application.exists({ resumeId: id })
+      if (inUse) {
         throw new GraphQLError('Cannot delete resume: it is referenced by one or more applications', {
           extensions: { code: 'CONSTRAINT_VIOLATION' },
         })
       }
-      const idx = resumes.findIndex((r) => r.id === id)
-      if (idx === -1) return false
-      resumes.splice(idx, 1)
-      return true
+      const result = await Resume.findByIdAndDelete(id)
+      return result !== null
     },
 
     tailorResume: async (_, { resumeId, applicationId }) => {
-      const resume = resumes.find((r) => r.id === resumeId)
+      const resume = await Resume.findById(resumeId)
       if (!resume) {
         throw new GraphQLError(`Resume with id "${resumeId}" not found`, {
           extensions: { code: 'NOT_FOUND' },
         })
       }
-      const application = applications.find((a) => a.id === applicationId)
+      const application = await Application.findById(applicationId)
       if (!application) {
         throw new GraphQLError(`Application with id "${applicationId}" not found`, {
           extensions: { code: 'NOT_FOUND' },
         })
       }
 
-      const fileBuffer = await readFile(resolve(__dirname, '.' + resume.filePath)).catch(() => {
+      const s3Key = new URL(resume.filePath).pathname.slice(1)
+      let fileBuffer
+      try {
+        const { Body } = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: s3Key }))
+        fileBuffer = await streamToBuffer(Body)
+      } catch {
         throw new GraphQLError(`Could not read resume file at "${resume.filePath}"`, {
           extensions: { code: 'FILE_READ_ERROR' },
         })
-      })
+      }
 
       let resumeText
       if (resume.fileType === 'DOCX') {

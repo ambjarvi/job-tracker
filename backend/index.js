@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import mongoose from 'mongoose'
 import express from 'express'
 import cors from 'cors'
 import { ApolloServer } from '@apollo/server'
@@ -17,12 +18,24 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1)
 })
 
+try {
+  await mongoose.connect(process.env.MONGODB_URI)
+  console.log('Connected to MongoDB')
+} catch (err) {
+  console.error('Failed to connect to MongoDB:', err)
+  process.exit(1)
+}
+
 const app = express()
 const server = new ApolloServer({ typeDefs, resolvers })
 await server.start()
 
-app.use(cors())
+const allowedOrigins = ['http://localhost:5174']
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL)
+
+app.use(cors({ origin: allowedOrigins }))
 app.use(graphqlUploadExpress({ maxFileSize: 10_000_000, maxFiles: 1 }))
 app.use('/', express.json(), expressMiddleware(server))
 
-app.listen(4000, () => console.log('GraphQL server ready at http://localhost:4000/'))
+const port = process.env.PORT ?? 4000
+app.listen(port, () => console.log(`GraphQL server ready at http://localhost:${port}/`))
