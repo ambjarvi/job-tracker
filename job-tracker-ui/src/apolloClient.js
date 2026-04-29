@@ -3,6 +3,16 @@ import { print } from 'graphql'
 
 const URI = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/'
 
+const authLink = new ApolloLink((operation, forward) => {
+  const token = localStorage.getItem('jwt')
+  if (token) {
+    operation.setContext(({ headers = {} }) => ({
+      headers: { ...headers, Authorization: `Bearer ${token}` },
+    }))
+  }
+  return forward(operation)
+})
+
 // Intercepts mutations that contain File variables and sends them as
 // multipart/form-data per the graphql-multipart-request-spec.
 const uploadLink = new ApolloLink((operation, forward) => {
@@ -32,7 +42,10 @@ const uploadLink = new ApolloLink((operation, forward) => {
   })
 
   return new Observable((observer) => {
-    fetch(URI, { method: 'POST', body: form, headers: { 'apollo-require-preflight': 'true' } })
+    const token = localStorage.getItem('jwt')
+    const uploadHeaders = { 'apollo-require-preflight': 'true' }
+    if (token) uploadHeaders['Authorization'] = `Bearer ${token}`
+    fetch(URI, { method: 'POST', body: form, headers: uploadHeaders })
       .then((res) => res.json())
       .then((result) => { observer.next(result); observer.complete() })
       .catch((err) => observer.error(err))
@@ -40,7 +53,7 @@ const uploadLink = new ApolloLink((operation, forward) => {
 })
 
 const client = new ApolloClient({
-  link: ApolloLink.from([uploadLink, new HttpLink({ uri: URI })]),
+  link: ApolloLink.from([authLink, uploadLink, new HttpLink({ uri: URI })]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: { fetchPolicy: 'cache-and-network' },

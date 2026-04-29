@@ -6,6 +6,7 @@ const resumeSchema = new mongoose.Schema(
     filePath: { type: String, required: true },
     fileType: { type: String, enum: ['PDF', 'DOCX'], required: true },
     uploadedAt: { type: String, default: () => new Date().toISOString() },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { versionKey: false }
 )

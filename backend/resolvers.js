@@ -2,16 +2,27 @@ import { GraphQLError } from 'graphql'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 import Anthropic from '@anthropic-ai/sdk'
 import mammoth from 'mammoth'
+import bcrypt from 'bcryptjs'
 import GraphQLUpload from 'graphql-upload/GraphQLUpload.mjs'
 import { v2 as cloudinary } from 'cloudinary'
 import { Resume } from './src/models/Resume.js'
 import { Application } from './src/models/Application.js'
+import { User } from './src/models/User.js'
+import { signToken } from './src/utils/token.js'
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 })
+
+function requireAuth(user) {
+  if (!user) {
+    throw new GraphQLError('Not authenticated', {
+      extensions: { code: 'UNAUTHENTICATED' },
+    })
+  }
+}
 
 async function streamToBuffer(stream) {
   const chunks = []
@@ -36,16 +47,29 @@ export const resolvers = {
   Upload: GraphQLUpload,
 
   Query: {
-    applications: async (_, { status }) => {
-      const filter = status ? { status } : {}
+    me: (_, __, { user }) => user ?? null,
+
+    applications: async (_, { status }, { user }) => {
+      requireAuth(user)
+      const filter = { userId: user._id }
+      if (status) filter.status = status
       return Application.find(filter)
     },
 
-    application: async (_, { id }) => Application.findById(id),
+    application: async (_, { id }, { user }) => {
+      requireAuth(user)
+      return Application.findOne({ _id: id, userId: user._id })
+    },
 
-    resumes: async () => Resume.find(),
+    resumes: async (_, __, { user }) => {
+      requireAuth(user)
+      return Resume.find({ userId: user._id })
+    },
 
-    resume: async (_, { id }) => Resume.findById(id),
+    resume: async (_, { id }, { user }) => {
+      requireAuth(user)
+      return Resume.findOne({ _id: id, userId: user._id })
+    },
   },
 
   Application: {
@@ -60,9 +84,38 @@ export const resolvers = {
   },
 
   Mutation: {
-    addApplication: async (_, { company, role, url = null, description = null, status, resumeId = null }) => {
+    register: async (_, { email, name, password }) => {
+      const existing = await User.findOne({ email })
+      if (existing) {
+        throw new GraphQLError('Email already in use', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        })
+      }
+      const passwordHash = await bcrypt.hash(password, 10)
+      const user = await User.create({ email, name, passwordHash })
+      return { token: signToken(user._id), user }
+    },
+
+    login: async (_, { email, password }) => {
+      const user = await User.findOne({ email })
+      if (!user || !user.passwordHash) {
+        throw new GraphQLError('Invalid credentials', {
+          extensions: { code: 'UNAUTHENTICATED' },
+        })
+      }
+      const valid = await bcrypt.compare(password, user.passwordHash)
+      if (!valid) {
+        throw new GraphQLError('Invalid credentials', {
+          extensions: { code: 'UNAUTHENTICATED' },
+        })
+      }
+      return { token: signToken(user._id), user }
+    },
+
+    addApplication: async (_, { company, role, url = null, description = null, status, resumeId = null }, { user }) => {
+      requireAuth(user)
       if (resumeId) {
-        const exists = await Resume.findById(resumeId)
+        const exists = await Resume.findOne({ _id: resumeId, userId: user._id })
         if (!exists) {
           throw new GraphQLError(`Resume with id "${resumeId}" not found`, {
             extensions: { code: 'NOT_FOUND' },
@@ -77,12 +130,14 @@ export const resolvers = {
         status,
         appliedAt: status !== 'WISHLIST' ? new Date().toISOString() : null,
         resumeId: resumeId || null,
+        userId: user._id,
       })
       return app.save()
     },
 
-    updateStatus: async (_, { id, status }) => {
-      const app = await Application.findById(id)
+    updateStatus: async (_, { id, status }, { user }) => {
+      requireAuth(user)
+      const app = await Application.findOne({ _id: id, userId: user._id })
       if (!app) return null
       app.status = status
       if (status !== 'WISHLIST' && !app.appliedAt) {
@@ -91,8 +146,9 @@ export const resolvers = {
       return app.save()
     },
 
-    updateApplication: async (_, { id, company, role, url, description, status, resumeId }) => {
-      const app = await Application.findById(id)
+    updateApplication: async (_, { id, company, role, url, description, status, resumeId }, { user }) => {
+      requireAuth(user)
+      const app = await Application.findOne({ _id: id, userId: user._id })
       if (!app) return null
       if (company !== undefined) app.company = company
       if (role !== undefined) app.role = role
@@ -100,7 +156,7 @@ export const resolvers = {
       if (description !== undefined) app.description = description ?? null
       if (resumeId !== undefined) {
         if (resumeId) {
-          const exists = await Resume.findById(resumeId)
+          const exists = await Resume.findOne({ _id: resumeId, userId: user._id })
           if (!exists) {
             throw new GraphQLError(`Resume with id "${resumeId}" not found`, {
               extensions: { code: 'NOT_FOUND' },
@@ -118,17 +174,20 @@ export const resolvers = {
       return app.save()
     },
 
-    deleteApplication: async (_, { id }) => {
-      const result = await Application.findByIdAndDelete(id)
+    deleteApplication: async (_, { id }, { user }) => {
+      requireAuth(user)
+      const result = await Application.findOneAndDelete({ _id: id, userId: user._id })
       return result !== null
     },
 
-    uploadResume: async (_, { name, filePath, fileType }) => {
-      const resume = new Resume({ name, filePath, fileType })
+    uploadResume: async (_, { name, filePath, fileType }, { user }) => {
+      requireAuth(user)
+      const resume = new Resume({ name, filePath, fileType, userId: user._id })
       return resume.save()
     },
 
-    uploadResumeFile: async (_, { name, file, fileType }) => {
+    uploadResumeFile: async (_, { name, file, fileType }, { user }) => {
+      requireAuth(user)
       const { createReadStream } = await file
       const buffer = await streamToBuffer(createReadStream())
 
@@ -139,29 +198,33 @@ export const resolvers = {
         ).end(buffer)
       })
 
-      const resume = new Resume({ name, filePath: result.secure_url, fileType })
+      const resume = new Resume({ name, filePath: result.secure_url, fileType, userId: user._id })
       return resume.save()
     },
 
-    deleteResume: async (_, { id }) => {
-      const inUse = await Application.exists({ resumeId: id })
+    deleteResume: async (_, { id }, { user }) => {
+      requireAuth(user)
+      const resume = await Resume.findOne({ _id: id, userId: user._id })
+      if (!resume) return false
+      const inUse = await Application.exists({ resumeId: id, userId: user._id })
       if (inUse) {
         throw new GraphQLError('Cannot delete resume: it is referenced by one or more applications', {
           extensions: { code: 'CONSTRAINT_VIOLATION' },
         })
       }
-      const result = await Resume.findByIdAndDelete(id)
-      return result !== null
+      await resume.deleteOne()
+      return true
     },
 
-    tailorResume: async (_, { resumeId, applicationId }) => {
-      const resume = await Resume.findById(resumeId)
+    tailorResume: async (_, { resumeId, applicationId }, { user }) => {
+      requireAuth(user)
+      const resume = await Resume.findOne({ _id: resumeId, userId: user._id })
       if (!resume) {
         throw new GraphQLError(`Resume with id "${resumeId}" not found`, {
           extensions: { code: 'NOT_FOUND' },
         })
       }
-      const application = await Application.findById(applicationId)
+      const application = await Application.findOne({ _id: applicationId, userId: user._id })
       if (!application) {
         throw new GraphQLError(`Application with id "${applicationId}" not found`, {
           extensions: { code: 'NOT_FOUND' },

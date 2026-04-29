@@ -1,8 +1,13 @@
 import { useState } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
 import Dashboard from './components/Dashboard'
 import AddApplicationForm from './components/AddApplicationForm'
 import ResumesView from './components/ResumesView'
 import TailorResume from './components/TailorResume'
+import Login from './components/auth/Login'
+import Register from './components/auth/Register'
+import AuthCallback from './components/auth/AuthCallback'
 
 const NAV = [
   {
@@ -43,12 +48,20 @@ const NAV = [
   },
 ]
 
-export default function App() {
+function ProtectedRoute({ children }) {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return children
+}
+
+function MainApp() {
   const [view, setView] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [tailorApplicationId, setTailorApplicationId] = useState(null)
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
-  function navigate(id) {
+  function navigateTo(id) {
     setTailorApplicationId(null)
     setView(id)
     setSidebarOpen(false)
@@ -94,7 +107,7 @@ export default function App() {
           {NAV.map((item) => (
             <button
               key={item.id}
-              onClick={() => navigate(item.id)}
+              onClick={() => navigateTo(item.id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
                 view === item.id
                   ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
@@ -109,32 +122,58 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="px-5 py-4 border-t border-zinc-800">
-          <p className="text-zinc-600 text-xs">Connected to localhost:4000</p>
+        {/* User + logout */}
+        <div className="px-3 py-4 border-t border-zinc-800 space-y-2">
+          {user && (
+            <div className="px-3 py-2">
+              <p className="text-zinc-300 text-xs font-medium truncate">{user.name || user.email}</p>
+              <p className="text-zinc-600 text-xs truncate">{user.email}</p>
+            </div>
+          )}
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+          >
+            <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Sign out
+          </button>
         </div>
       </aside>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar (mobile) */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-zinc-900 border-b border-zinc-800">
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-zinc-900 border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <span className="text-zinc-100 font-semibold text-sm">
+              {NAV.find((n) => n.id === view)?.label}
+            </span>
+          </div>
           <button
-            onClick={() => setSidebarOpen(true)}
+            onClick={logout}
             className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors"
+            title="Sign out"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
           </button>
-          <span className="text-zinc-100 font-semibold text-sm">
-            {NAV.find((n) => n.id === view)?.label}
-          </span>
         </header>
 
         <main className="flex-1 p-6 lg:p-8 overflow-auto">
           {view === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
           {view === 'add' && (
-            <AddApplicationForm onSuccess={() => navigate('dashboard')} />
+            <AddApplicationForm onSuccess={() => navigateTo('dashboard')} />
           )}
           {view === 'resumes' && <ResumesView />}
           {view === 'tailor' && (
@@ -143,5 +182,23 @@ export default function App() {
         </main>
       </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <MainApp />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   )
 }

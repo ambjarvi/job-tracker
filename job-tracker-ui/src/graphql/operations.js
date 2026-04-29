@@ -1,5 +1,31 @@
 import { gql } from '@apollo/client/core'
 
+export const LOGIN = gql`
+  mutation Login($email: String!, $password: String!) {
+    login(email: $email, password: $password) {
+      token
+      user {
+        id
+        email
+        name
+      }
+    }
+  }
+`
+
+export const REGISTER = gql`
+  mutation Register($email: String!, $name: String!, $password: String!) {
+    register(email: $email, name: $name, password: $password) {
+      token
+      user {
+        id
+        email
+        name
+      }
+    }
+  }
+`
+
 export const GET_APPLICATIONS = gql`
   query GetApplications {
     applications {

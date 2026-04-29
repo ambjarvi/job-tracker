@@ -1,6 +1,17 @@
 export const typeDefs = `#graphql
   scalar Upload
 
+  type User {
+    id: ID!
+    email: String!
+    name: String!
+  }
+
+  type AuthPayload {
+    token: String!
+    user: User!
+  }
+
   enum ApplicationStatus {
     WISHLIST
     APPLIED
@@ -36,6 +47,7 @@ export const typeDefs = `#graphql
   }
 
   type Query {
+    me: User
     applications(status: ApplicationStatus): [Application!]!
     application(id: ID!): Application
     resumes: [Resume!]!
@@ -51,6 +63,9 @@ export const typeDefs = `#graphql
   }
 
   type Mutation {
+    register(email: String!, name: String!, password: String!): AuthPayload!
+    login(email: String!, password: String!): AuthPayload!
+
     addApplication(
       company: String!
       role: String!

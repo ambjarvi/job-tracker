@@ -13,6 +13,7 @@ const applicationSchema = new mongoose.Schema(
     },
     appliedAt: { type: String, default: null },
     resumeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Resume', default: null },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { versionKey: false }
 )
