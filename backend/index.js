@@ -36,7 +36,7 @@ const app = express()
 const server = new ApolloServer({ typeDefs, resolvers })
 await server.start()
 
-const allowedOrigins = ['http://localhost:5174']
+const allowedOrigins = ['http://localhost:5173']
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL)
 
 app.use(cors({ origin: allowedOrigins, credentials: true }))
@@ -89,7 +89,7 @@ app.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     const token = signToken(req.user._id)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174'
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
     res.redirect(`${frontendUrl}/auth/callback?token=${token}`)
   }
 )
