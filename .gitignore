@@ -1,5 +1,7 @@
 backend/.env
+job-tracker-ui/.env
 node_modules/
 backend/node_modules/
 job-tracker-ui/node_modules/
 job-tracker-ui/dist/
+.DS_Store
