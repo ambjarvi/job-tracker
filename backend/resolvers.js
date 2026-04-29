@@ -163,24 +163,47 @@ export const resolvers = {
       const client = new Anthropic()
       const message = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        max_tokens: 4096,
         messages: [
           {
             role: 'user',
-            content: `You are a career coach helping tailor a resume for a specific job application.
+            content: `You are a resume editor. Tailor the resume below for the job posting provided. You must respond with ONLY a valid JSON object and no other text, markdown, or explanation.
+
+Rules:
+- Do not invent, fabricate, or imply any skill, tool, technology, or experience that is not already present in the resume
+- Only reword, reorder, and re-emphasize what already exists
+
+Return exactly this JSON structure:
+{
+  "tailoredResume": "the full rewritten resume text",
+  "changes": "bullet list of what was reworded or re-emphasized",
+  "suggestions": "bullet list of skills or experience the job mentions that are NOT in the resume, framed as: if you have experience with X, consider adding it"
+}
 
 Job: ${application.role} at ${application.company}
 ${application.description ? `Job Description:\n${application.description}\n` : ''}
-Resume Content:
-${resumeText}
-
-Provide specific, actionable suggestions to tailor this resume for the job. Focus on keywords to add, skills to highlight, and experience to reframe.`,
+Resume:
+${resumeText}`,
           },
         ],
       })
 
-      const suggestions = message.content[0].type === 'text' ? message.content[0].text : ''
-      return { resumeId, applicationId, suggestions }
+      const raw = message.content[0].type === 'text' ? message.content[0].text : ''
+      let parsed
+      try {
+        parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
+      } catch {
+        throw new GraphQLError(`Failed to parse AI response as JSON. Raw response: ${raw}`, {
+          extensions: { code: 'AI_PARSE_ERROR' },
+        })
+      }
+      return {
+        resumeId,
+        applicationId,
+        tailoredResume: parsed.tailoredResume,
+        changes: parsed.changes,
+        suggestions: parsed.suggestions,
+      }
     },
   },
 }

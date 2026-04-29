@@ -45,6 +45,8 @@ export const typeDefs = `#graphql
   type TailoringResult {
     resumeId: ID!
     applicationId: ID!
+    tailoredResume: String!
+    changes: String!
     suggestions: String!
   }
 

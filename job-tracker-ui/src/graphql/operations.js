@@ -92,6 +92,8 @@ export const TAILOR_RESUME = gql`
     tailorResume(applicationId: $applicationId, resumeId: $resumeId) {
       resumeId
       applicationId
+      tailoredResume
+      changes
       suggestions
     }
   }
